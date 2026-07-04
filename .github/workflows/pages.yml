@@ -1,7 +1,8 @@
 name: Deploy Pages
 # 静的サイト（index.html 他）を GitHub Pages へデプロイ。
-# 5分刻みポーラで短時間に何度も push されるため concurrency: cancel-in-progress: true＝
-# 進行中デプロイは新しい push でキャンセル（失敗にならない）＝最新の1件だけ完了。
+# 5分刻みポーラの連続 push 対策＝concurrency: cancel-in-progress（重複デプロイは新 push でキャンセル）。
+# GitHub Pages バックエンドの単発 transient 失敗("Deployment failed, try again later.")対策＝
+# deploy-pages を最大3回リトライ（30秒バックオフ）＝失敗通知を自己回復で消す。
 on:
   push:
     branches: [main]
@@ -18,9 +19,7 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    environment: github-pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,5 +27,17 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+      - id: try1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.try1.outcome == 'failure'
+        run: sleep 30
+      - id: try2
+        if: steps.try1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.try1.outcome == 'failure' && steps.try2.outcome == 'failure'
+        run: sleep 30
       - id: deployment
+        if: steps.try1.outcome == 'failure' && steps.try2.outcome == 'failure'
         uses: actions/deploy-pages@v4
