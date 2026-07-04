@@ -1,0 +1,32 @@
+name: Deploy Pages
+# 静的サイト（index.html 他）を GitHub Pages へデプロイ。
+# 5分刻みポーラで短時間に何度も push されるため concurrency: cancel-in-progress: true＝
+# 進行中デプロイは新しい push でキャンセル（失敗にならない）＝最新の1件だけ完了。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
